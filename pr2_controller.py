@@ -1,4 +1,4 @@
-from controller import Camera, Device, RangeFinder, Motor, Supervisor, PositionSensor, Robot, TouchSensor, Lidar
+from controller import Camera, Device, InertialUnit, Motor, GPS, PositionSensor, Robot, TouchSensor, Lidar
 from controller import LidarPoint
 import numpy as np
 import math
@@ -74,7 +74,7 @@ laser_tilt_width = 0
 base_laser_width = 0
 laser_tilt_maxRange = 0
 base_laser_maxRange = 0
-
+head_tilt_joint_sensor = []
 
 def initialize_devices():
     wheel_motors.append(robot.getMotor("fl_caster_l_wheel_joint"))  # FLL_WHEEL
@@ -125,6 +125,8 @@ def initialize_devices():
     for i in range(4):
         right_finger_sensors.append(right_finger_motors[i].getPositionSensor())
 
+    # head_tilt_joint_sensor.append(robot.getPositionSensor("head_tilt_joint_sensor"))
+    # head_tilt_joint_sensor[0].enable(TIME_STEP)
     # head_tilt_motor.append(robot.getDevice("head_tilt_joint"))
     # torso_motor.append(robot.getMotor("torso_lift_joint"))
     # torso_sensor.append(robot.getMotor("torso_lift_joint_sensor"))
@@ -135,7 +137,7 @@ def initialize_devices():
     # right_finger_contact_sensors.append(robot.getMotor("r_gripper_r_finger_tip_contact_sensor"))  # RIGHT_FINGER
     # print(right_finger_contact_sensors[0])
     # # imu_sensor.append(Robot.getMotor("imu_sensor"))
-    #
+
     # wide_stereo_l_stereo_camera_sensor.append(robot.getCamera("wide_stereo_l_stereo_camera_sensor"))
     # wide_stereo_r_stereo_camera_sensor.append(robot.getCamera("wide_stereo_r_stereo_camera_sensor"))
     # high_def_sensor.append(robot.getCamera("high_def_sensor"))
@@ -218,22 +220,25 @@ def set_left_arm_position(shoulder_roll, shoulder_lift, upper_arm_roll, elbow_li
 
 def lidar_setting():
     temp = robot.getLidar("base_laser")
-    # print("getLidar:", temp)
     temp.enable(TIME_STEP)
-    # print("enable:", temp.enable(TIME_STEP))
-    # print("enablePointCloud:", temp.enablePointCloud())
-    # print("is:", temp.isPointCloudEnabled())
 
     base_laser_value = temp.getRangeImage()
-    print("Left:", base_laser_value[639], "Front:", base_laser_value[300], "Right:", base_laser_value[0])
+    print("Lidar => Left:", base_laser_value[639], "Front:", base_laser_value[300], "Right:", base_laser_value[0])
+
+    loc = gps.getValues()
+
+    RFID = []
+    for i in range(0, 640, 10):
+        x = loc[0] + base_laser_value[i] * math.cos(-45 + (270 / 640) * i)
+        y = loc[2] + base_laser_value[i] * math.sin(-45 + (270 / 640) * i)
+        RFID.append([x, y])
+
+    # print("RFID: ", RFID)
+    return loc
 
 
 def camara_setting():
-
-    # print(camera.getWidth())
-    # print(camera.getHeight())
     # print(camera.getWidth(), camera.getHeight())
-
     cameraData = camera.getImageArray()
     print(cameraData)
 
@@ -241,13 +246,23 @@ def camara_setting():
 if __name__ == '__main__':
     robot = Robot()
     initialize_devices()
+
     # camara_setting()
-    camera = robot.getCamera("high_def_sensor")
+    camera = robot.getCamera("camera")
     camera.enable(TIME_STEP)
     camera.getWidth()
     camera.getHeight()
 
-    while robot.step(TIME_STEP * 20) != -1:
+    gps = robot.getGPS("gps")
+    gps.enable(TIME_STEP)
+    imu = robot.getInertialUnit("imu_sensor")
+    imu.enable(TIME_STEP)
+
+    old_time = 0
+    location = [0, 0, 0]
+    old_angle = imu.getRollPitchYaw()[2]
+
+    while robot.step(TIME_STEP * 10) != -1:
         wheel_motors[FLL_WHEEL].setPosition(float('Inf'))
         wheel_motors[FLR_WHEEL].setPosition(float('Inf'))
         wheel_motors[FRL_WHEEL].setPosition(float('Inf'))
@@ -265,12 +280,38 @@ if __name__ == '__main__':
         wheel_motors[BLR_WHEEL].setVelocity(50)
         wheel_motors[BRL_WHEEL].setVelocity(50)
         wheel_motors[BRR_WHEEL].setVelocity(50)
-        lidar_setting()
+
+        new_location = lidar_setting()
+        print("new_location: ", new_location)
+        new_time = robot.getTime()
+        new_angle = imu.getRollPitchYaw()[2]
+
+        velocity = ((new_location[0]-location[0])**2 + (new_location[2]-location[2])**2)**0.5 / (new_time-old_time)
+        if new_angle < 0:
+            new_angle = new_angle + 2 * math.pi
+
+        angle_velocity = (new_angle - old_angle) / (new_time - old_time)
+
+        if abs(new_angle - old_angle) > 1 and new_angle > math.pi:
+            angle_velocity = (new_angle - 2 * math.pi - old_angle) / (new_time - old_time)
+        elif abs(new_angle - old_angle) > 1 and new_angle < math.pi:
+            angle_velocity = (new_angle + 2 * math.pi - old_angle) / (new_time - old_time)
+        else:
+            angle_velocity = (new_angle - old_angle) / (new_time - old_time)
+
+        print("Velocity: ", velocity)
+        print("angle: ", old_angle)
+        print("Angle velocity: ", angle_velocity)
+
+        old_time = new_time
+        location = new_location
+        old_angle = new_angle
+
         cameraData = camera.getImageArray()
-
         # print(cameraData)
+        print("=================================")
 
-    # lidar_setting()
+
     # enable_devices()
 
     # set_left_arm_position(10, 10, 10, 10, 10)
