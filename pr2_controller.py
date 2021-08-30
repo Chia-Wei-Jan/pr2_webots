@@ -76,6 +76,7 @@ laser_tilt_maxRange = 0
 base_laser_maxRange = 0
 head_tilt_joint_sensor = []
 
+
 def initialize_devices():
     wheel_motors.append(robot.getMotor("fl_caster_l_wheel_joint"))  # FLL_WHEEL
     wheel_motors.append(robot.getMotor("fl_caster_r_wheel_joint"))  # FLR_WHEEL
@@ -138,11 +139,6 @@ def initialize_devices():
     # print(right_finger_contact_sensors[0])
     # # imu_sensor.append(Robot.getMotor("imu_sensor"))
 
-    # wide_stereo_l_stereo_camera_sensor.append(robot.getCamera("wide_stereo_l_stereo_camera_sensor"))
-    # wide_stereo_r_stereo_camera_sensor.append(robot.getCamera("wide_stereo_r_stereo_camera_sensor"))
-    # high_def_sensor.append(robot.getCamera("high_def_sensor"))
-    # r_forearm_cam_sensor.append(robot.getCamera("r_forearm_cam_sensor"))
-    # l_forearm_cam_sensor.append(robot.getCamera("l_forearm_cam_sensor"))
     # laser_tilt.append(robot.getLidar("laser_tilt"))
     # base_laser.append(robot.getLidar("base_laser"))
 
@@ -247,6 +243,13 @@ if __name__ == '__main__':
     robot = Robot()
     initialize_devices()
 
+    # left_finger = robot.getMotor("l_gripper_l_finger_joint")
+    # right_finger = robot.getMotor("l_gripper_r_finger_joint")
+    slide = robot.getMotor("torso_lift_joint")
+    slide.setPosition(0.1)
+    left_finger_motors[LEFT_FINGER].setPosition(10)
+    left_finger_motors[RIGHT_FINGER].setPosition(10)
+
     # camara_setting()
     camera = robot.getCamera("camera")
     camera.enable(TIME_STEP)
@@ -263,30 +266,31 @@ if __name__ == '__main__':
     old_angle = imu.getRollPitchYaw()[2]
 
     while robot.step(TIME_STEP * 10) != -1:
-        wheel_motors[FLL_WHEEL].setPosition(float('Inf'))
-        wheel_motors[FLR_WHEEL].setPosition(float('Inf'))
-        wheel_motors[FRL_WHEEL].setPosition(float('Inf'))
-        wheel_motors[FRR_WHEEL].setPosition(float('Inf'))
-        wheel_motors[BLL_WHEEL].setPosition(float('Inf'))
-        wheel_motors[BLR_WHEEL].setPosition(float('Inf'))
-        wheel_motors[BRL_WHEEL].setPosition(float('Inf'))
-        wheel_motors[BRR_WHEEL].setPosition(float('Inf'))
-
-        wheel_motors[FLL_WHEEL].setVelocity(50)
-        wheel_motors[FLR_WHEEL].setVelocity(50)
-        wheel_motors[FRL_WHEEL].setVelocity(50)
-        wheel_motors[FRR_WHEEL].setVelocity(50)
-        wheel_motors[BLL_WHEEL].setVelocity(50)
-        wheel_motors[BLR_WHEEL].setVelocity(50)
-        wheel_motors[BRL_WHEEL].setVelocity(50)
-        wheel_motors[BRR_WHEEL].setVelocity(50)
+        # wheel_motors[FLL_WHEEL].setPosition(float('Inf'))
+        # wheel_motors[FLR_WHEEL].setPosition(float('Inf'))
+        # wheel_motors[FRL_WHEEL].setPosition(float('Inf'))
+        # wheel_motors[FRR_WHEEL].setPosition(float('Inf'))
+        # wheel_motors[BLL_WHEEL].setPosition(float('Inf'))
+        # wheel_motors[BLR_WHEEL].setPosition(float('Inf'))
+        # wheel_motors[BRL_WHEEL].setPosition(float('Inf'))
+        # wheel_motors[BRR_WHEEL].setPosition(float('Inf'))
+        #
+        # wheel_motors[FLL_WHEEL].setVelocity(50)
+        # wheel_motors[FLR_WHEEL].setVelocity(50)
+        # wheel_motors[FRL_WHEEL].setVelocity(50)
+        # wheel_motors[FRR_WHEEL].setVelocity(50)
+        # wheel_motors[BLL_WHEEL].setVelocity(50)
+        # wheel_motors[BLR_WHEEL].setVelocity(50)
+        # wheel_motors[BRL_WHEEL].setVelocity(50)
+        # wheel_motors[BRR_WHEEL].setVelocity(50)
 
         new_location = lidar_setting()
         print("new_location: ", new_location)
         new_time = robot.getTime()
         new_angle = imu.getRollPitchYaw()[2]
 
-        velocity = ((new_location[0]-location[0])**2 + (new_location[2]-location[2])**2)**0.5 / (new_time-old_time)
+        velocity = ((new_location[0] - location[0]) ** 2 + (new_location[2] - location[2]) ** 2) ** 0.5 / (
+                    new_time - old_time)
         if new_angle < 0:
             new_angle = new_angle + 2 * math.pi
 
