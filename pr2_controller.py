@@ -2,6 +2,13 @@ from controller import Camera, Device, InertialUnit, Motor, GPS, PositionSensor,
 from controller import LidarPoint
 import numpy as np
 import math
+import sys
+import tempfile
+import ikpy
+from ikpy.chain import Chain
+from controller import Supervisor
+# import urdfpy.urdf
+# from lxml import etree as ET
 
 TIME_STEP = 16
 
@@ -78,51 +85,51 @@ head_tilt_joint_sensor = []
 
 
 def initialize_devices():
-    wheel_motors.append(robot.getMotor("fl_caster_l_wheel_joint"))  # FLL_WHEEL
-    wheel_motors.append(robot.getMotor("fl_caster_r_wheel_joint"))  # FLR_WHEEL
-    wheel_motors.append(robot.getMotor("fr_caster_l_wheel_joint"))  # FRL_WHEEL
-    wheel_motors.append(robot.getMotor("fr_caster_r_wheel_joint"))  # FRR_WHEEL
-    wheel_motors.append(robot.getMotor("bl_caster_l_wheel_joint"))  # BLL_WHEEL
-    wheel_motors.append(robot.getMotor("bl_caster_r_wheel_joint"))  # BLR_WHEEL
-    wheel_motors.append(robot.getMotor("br_caster_l_wheel_joint"))  # BRL_WHEEL
-    wheel_motors.append(robot.getMotor("br_caster_r_wheel_joint"))  # BRR_WHEEL
+    wheel_motors.append(robot.getDevice("fl_caster_l_wheel_joint"))  # FLL_WHEEL
+    wheel_motors.append(robot.getDevice("fl_caster_r_wheel_joint"))  # FLR_WHEEL
+    wheel_motors.append(robot.getDevice("fr_caster_l_wheel_joint"))  # FRL_WHEEL
+    wheel_motors.append(robot.getDevice("fr_caster_r_wheel_joint"))  # FRR_WHEEL
+    wheel_motors.append(robot.getDevice("bl_caster_l_wheel_joint"))  # BLL_WHEEL
+    wheel_motors.append(robot.getDevice("bl_caster_r_wheel_joint"))  # BLR_WHEEL
+    wheel_motors.append(robot.getDevice("br_caster_l_wheel_joint"))  # BRL_WHEEL
+    wheel_motors.append(robot.getDevice("br_caster_r_wheel_joint"))  # BRR_WHEEL
     for i in range(8):
         wheel_sensors.append(wheel_motors[i].getPositionSensor())
 
-    rotation_motors.append(robot.getMotor("fl_caster_rotation_joint"))  # FL_ROTATION
-    rotation_motors.append(robot.getMotor("fr_caster_rotation_joint"))  # FR_ROTATION
-    rotation_motors.append(robot.getMotor("bl_caster_rotation_joint"))  # BL_ROTATION
-    rotation_motors.append(robot.getMotor("br_caster_rotation_joint"))  # BR_ROTATION
+    rotation_motors.append(robot.getDevice("fl_caster_rotation_joint"))  # FL_ROTATION
+    rotation_motors.append(robot.getDevice("fr_caster_rotation_joint"))  # FR_ROTATION
+    rotation_motors.append(robot.getDevice("bl_caster_rotation_joint"))  # BL_ROTATION
+    rotation_motors.append(robot.getDevice("br_caster_rotation_joint"))  # BR_ROTATION
     for i in range(4):
         rotation_sensors.append(rotation_motors[i].getPositionSensor())
 
-    left_arm_motors.append(robot.getMotor("l_shoulder_pan_joint"))  # SHOULDER_ROLL
-    left_arm_motors.append(robot.getMotor("l_shoulder_lift_joint"))  # SHOULDER_LIFT
-    left_arm_motors.append(robot.getMotor("l_upper_arm_roll_joint"))  # UPPER_ARM_ROLL
-    left_arm_motors.append(robot.getMotor("l_elbow_flex_joint"))  # ELBOW_LIFT
-    left_arm_motors.append(robot.getMotor("l_wrist_roll_joint"))  # WRIST_ROLL
+    left_arm_motors.append(robot.getDevice("l_shoulder_pan_joint"))  # SHOULDER_ROLL
+    left_arm_motors.append(robot.getDevice("l_shoulder_lift_joint"))  # SHOULDER_LIFT
+    left_arm_motors.append(robot.getDevice("l_upper_arm_roll_joint"))  # UPPER_ARM_ROLL
+    left_arm_motors.append(robot.getDevice("l_elbow_flex_joint"))  # ELBOW_LIFT
+    left_arm_motors.append(robot.getDevice("l_wrist_roll_joint"))  # WRIST_ROLL
     for i in range(5):
         left_arm_sensors.append(left_arm_motors[i].getPositionSensor())
 
-    right_arm_motors.append(robot.getMotor("r_shoulder_pan_joint"))  # SHOULDER_ROLL
-    right_arm_motors.append(robot.getMotor("r_shoulder_lift_joint"))  # SHOULDER_LIFT
-    right_arm_motors.append(robot.getMotor("r_upper_arm_roll_joint"))  # UPPER_ARM_ROLL
-    right_arm_motors.append(robot.getMotor("r_elbow_flex_joint"))  # ELBOW_LIFT
-    right_arm_motors.append(robot.getMotor("r_wrist_roll_joint"))  # WRIST_ROLL
+    right_arm_motors.append(robot.getDevice("r_shoulder_pan_joint"))  # SHOULDER_ROLL
+    right_arm_motors.append(robot.getDevice("r_shoulder_lift_joint"))  # SHOULDER_LIFT
+    right_arm_motors.append(robot.getDevice("r_upper_arm_roll_joint"))  # UPPER_ARM_ROLL
+    right_arm_motors.append(robot.getDevice("r_elbow_flex_joint"))  # ELBOW_LIFT
+    right_arm_motors.append(robot.getDevice("r_wrist_roll_joint"))  # WRIST_ROLL
     for i in range(5):
         right_arm_sensors.append(right_arm_motors[i].getPositionSensor())
 
-    left_finger_motors.append(robot.getMotor("l_gripper_l_finger_joint"))  # LEFT_FINGER
-    left_finger_motors.append(robot.getMotor("l_gripper_r_finger_joint"))  # RIGHT_FINGER
-    left_finger_motors.append(robot.getMotor("l_gripper_l_finger_tip_joint"))  # LEFT_TIP
-    left_finger_motors.append(robot.getMotor("l_gripper_r_finger_tip_joint"))  # RIGHT_TIP
+    left_finger_motors.append(robot.getDevice("l_gripper_l_finger_joint"))  # LEFT_FINGER
+    left_finger_motors.append(robot.getDevice("l_gripper_r_finger_joint"))  # RIGHT_FINGER
+    left_finger_motors.append(robot.getDevice("l_gripper_l_finger_tip_joint"))  # LEFT_TIP
+    left_finger_motors.append(robot.getDevice("l_gripper_r_finger_tip_joint"))  # RIGHT_TIP
     for i in range(4):
         left_finger_sensors.append(left_finger_motors[i].getPositionSensor())
 
-    right_finger_motors.append(robot.getMotor("r_gripper_l_finger_joint"))  # LEFT_FINGER
-    right_finger_motors.append(robot.getMotor("r_gripper_r_finger_joint"))  # RIGHT_FINGER
-    right_finger_motors.append(robot.getMotor("r_gripper_l_finger_tip_joint"))  # LEFT_TIP
-    right_finger_motors.append(robot.getMotor("r_gripper_r_finger_tip_joint"))  # RIGHT_TIP
+    right_finger_motors.append(robot.getDevice("r_gripper_l_finger_joint"))  # LEFT_FINGER
+    right_finger_motors.append(robot.getDevice("r_gripper_r_finger_joint"))  # RIGHT_FINGER
+    right_finger_motors.append(robot.getDevice("r_gripper_l_finger_tip_joint"))  # LEFT_TIP
+    right_finger_motors.append(robot.getDevice("r_gripper_r_finger_tip_joint"))  # RIGHT_TIP
     for i in range(4):
         right_finger_sensors.append(right_finger_motors[i].getPositionSensor())
 
@@ -215,7 +222,7 @@ def set_left_arm_position(shoulder_roll, shoulder_lift, upper_arm_roll, elbow_li
 
 
 def lidar_setting():
-    temp = robot.getLidar("base_laser")
+    temp = robot.getDevice("base_laser")
     temp.enable(TIME_STEP)
 
     base_laser_value = temp.getRangeImage()
@@ -243,46 +250,44 @@ if __name__ == '__main__':
     robot = Robot()
     initialize_devices()
 
-    # left_finger = robot.getMotor("l_gripper_l_finger_joint")
-    # right_finger = robot.getMotor("l_gripper_r_finger_joint")
-    slide = robot.getMotor("torso_lift_joint")
+    slide = robot.getDevice("torso_lift_joint")
     slide.setPosition(0.1)
     left_finger_motors[LEFT_FINGER].setPosition(10)
     left_finger_motors[RIGHT_FINGER].setPosition(10)
 
     # camara_setting()
-    camera = robot.getCamera("camera")
+    camera = robot.getDevice("camera")
     camera.enable(TIME_STEP)
     camera.getWidth()
     camera.getHeight()
 
-    gps = robot.getGPS("gps")
+    gps = robot.getDevice("gps")
     gps.enable(TIME_STEP)
-    imu = robot.getInertialUnit("imu_sensor")
+    imu = robot.getDevice("imu_sensor")
     imu.enable(TIME_STEP)
 
     old_time = 0
     location = [0, 0, 0]
     old_angle = imu.getRollPitchYaw()[2]
-
+    print("5")
     while robot.step(TIME_STEP * 10) != -1:
-        # wheel_motors[FLL_WHEEL].setPosition(float('Inf'))
-        # wheel_motors[FLR_WHEEL].setPosition(float('Inf'))
-        # wheel_motors[FRL_WHEEL].setPosition(float('Inf'))
-        # wheel_motors[FRR_WHEEL].setPosition(float('Inf'))
-        # wheel_motors[BLL_WHEEL].setPosition(float('Inf'))
-        # wheel_motors[BLR_WHEEL].setPosition(float('Inf'))
-        # wheel_motors[BRL_WHEEL].setPosition(float('Inf'))
-        # wheel_motors[BRR_WHEEL].setPosition(float('Inf'))
-        #
-        # wheel_motors[FLL_WHEEL].setVelocity(50)
-        # wheel_motors[FLR_WHEEL].setVelocity(50)
-        # wheel_motors[FRL_WHEEL].setVelocity(50)
-        # wheel_motors[FRR_WHEEL].setVelocity(50)
-        # wheel_motors[BLL_WHEEL].setVelocity(50)
-        # wheel_motors[BLR_WHEEL].setVelocity(50)
-        # wheel_motors[BRL_WHEEL].setVelocity(50)
-        # wheel_motors[BRR_WHEEL].setVelocity(50)
+        wheel_motors[FLL_WHEEL].setPosition(float('Inf'))
+        wheel_motors[FLR_WHEEL].setPosition(float('Inf'))
+        wheel_motors[FRL_WHEEL].setPosition(float('Inf'))
+        wheel_motors[FRR_WHEEL].setPosition(float('Inf'))
+        wheel_motors[BLL_WHEEL].setPosition(float('Inf'))
+        wheel_motors[BLR_WHEEL].setPosition(float('Inf'))
+        wheel_motors[BRL_WHEEL].setPosition(float('Inf'))
+        wheel_motors[BRR_WHEEL].setPosition(float('Inf'))
+
+        wheel_motors[FLL_WHEEL].setVelocity(50)
+        wheel_motors[FLR_WHEEL].setVelocity(50)
+        wheel_motors[FRL_WHEEL].setVelocity(50)
+        wheel_motors[FRR_WHEEL].setVelocity(50)
+        wheel_motors[BLL_WHEEL].setVelocity(50)
+        wheel_motors[BLR_WHEEL].setVelocity(50)
+        wheel_motors[BRL_WHEEL].setVelocity(50)
+        wheel_motors[BRR_WHEEL].setVelocity(50)
 
         new_location = lidar_setting()
         print("new_location: ", new_location)
