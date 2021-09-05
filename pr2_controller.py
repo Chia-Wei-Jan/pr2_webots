@@ -4,9 +4,9 @@ import numpy as np
 import math
 import sys
 import tempfile
-import ikpy
-import ikpy.urdf.URDF
+import ikpy.inverse_kinematics as IK
 import ikpy.chain
+import ikpy.urdf.URDF
 import pathlib
 
 TIME_STEP = 16
@@ -254,27 +254,55 @@ if __name__ == '__main__':
     #     filename = file.name
     #     file.write(robot.getUrdf().encode('utf-8'))
     print("1")
-    # left_arm_chain = Chain.from_urdf_file(urdf_file='pr2.urdf',
-    #                                       base_elements=["l_shoulder_pan_joint", "l_shoulder_pan_link",
-    #                                                      "l_shoulder_lift_joint", "solid_0",
-    #                                                      "l_upper_arm_roll_joint", "solid_1", "solid_1_solid_2_joint",
-    #                                                      "solid_2", "l_elbow_flex_joint", "solid_3",
-    #                                                      "l_forearm_roll_joint", "solid_4", "solid_4_solid_6_joint",
-    #                                                      "solid_6", "l_wrist_flex_joint", "l_wrist_flex_link",
-    #                                                      "l_wrist_roll_joint", "solid_7", "solid_7_solid_8_joint",
-    #                                                      ])
-    left_arm_chain = ikpy.urdf.URDF.get_chain_from_joints(urdf_file='pr2.urdf',
-                                                          joints=["l_shoulder_pan_joint", "l_shoulder_lift_joint",
-                                                                  "l_upper_arm_roll_joint", "solid_1_solid_2_joint",
-                                                                  "l_elbow_flex_joint", "l_forearm_roll_joint",
-                                                                  "solid_4_solid_6_joint", "l_wrist_flex_joint",
-                                                                  "l_wrist_roll_joint", "solid_7_solid_8_joint"])
-    print(left_arm_chain)
-    # fwResult = left_arm_chain.forward_kinematics([0] * 20)
+    left_arm_chain = ikpy.chain.Chain.from_urdf_file(urdf_file='pr2.urdf',
+                                                     base_element_type='joint',
+                                                     base_elements=[
+                                                         # "l_shoulder_pan_link",
+                                                         "l_shoulder_lift_joint",
+
+                                                         # "solid_0",
+                                                         # "l_upper_arm_roll_joint",
+                                                         # "solid_1",
+                                                         # "solid_1_solid_2_joint",
+                                                         # "solid_2"
+                                                         # "l_elbow_flex_joint", "solid_3",
+                                                         # "l_forearm_roll_joint", "solid_4",
+                                                         # "solid_4_solid_6_joint",
+                                                         # "solid_6", "l_wrist_flex_joint",
+                                                         # "l_wrist_flex_link"
+                                                         # "l_wrist_roll_joint",
+                                                         # "solid_7"
+                                                         # "solid_7_solid_8_joint"
+                                                     ])
+    # # left_arm_chain = ikpy.urdf.URDF.get_chain_from_joints(urdf_file='pr2.urdf',
+    # #                                                       joints=["l_shoulder_pan_joint", "l_shoulder_lift_joint",
+    # #                                                               "l_upper_arm_roll_joint", "solid_1_solid_2_joint",
+    # #                                                               "l_elbow_flex_joint", "l_forearm_roll_joint",
+    # #                                                               "solid_4_solid_6_joint", "l_wrist_flex_joint",
+    # #                                                               "l_wrist_roll_joint", "solid_7_solid_8_joint"])
+    # print(11111111111111111111)
+    # print(left_arm_chain)
+    # print(222222222222222222222222222222)
     # target_position = [2.87, 0.61, 7.21]
     # IKPY_MAX_ITERATIONS = 4
     # initial_position = [1, 0, 6]
-    # ikResults = left_arm_chain.inverse_kinematics(target_position, max_iter=IKPY_MAX_ITERATIONS, initial_position=initial_position)
+    # # left_arm_chain = list(left_arm_chain)
+    # position = left_arm_chain.forward_kinematics([0, 0, 0, 0, 0.2, 0, 0, 0, 0])
+    # print(position)
+    # print(33333333333333333333333333333333)
+    # ikResults = left_arm_chain.inverse_kinematics([position[0][3], position[1][3], position[2][3]])
+    # # ikResults = left_arm_chain.inverse_kinematics(target_position, max_iter=IKPY_MAX_ITERATIONS,
+    # #                                                  initial_position=initial_position)
+    # print(444444444444444444444444444444444444444)
+    # print(ikResults)
+    # print(5555555555555555555)
+    # position = left_arm_chain.forward_kinematics([0.00000000e+00, 5.19360893e-02, -2.36179853e-10, 0.00000000e+00,
+    #                                               0.00000000e+00, -2.36179853e-10, 0.00000000e+00, 0.00000000e+00,
+    #                                               0.00000000e+00])
+    # print(position)
+    # ikResults = IK.inverse_kinematic_optimization(chain=left_arm_chain,
+    #                                               starting_nodes_angles=[10, 10, 10, 10, 10, 10, 10, 10, 10, 10],
+    #                                               target_frame=target_position, max_iter=IKPY_MAX_ITERATIONS)
     # ikResults = left_arm_chain.inverse_kinematics(target_position)
     print("2")
 
