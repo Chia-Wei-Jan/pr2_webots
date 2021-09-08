@@ -249,7 +249,9 @@ if __name__ == '__main__':
     robot = Robot()
     initialize_devices()
 
-    left_arm_chain = ikpy.chain.Chain.from_urdf_file(urdf_file='pr2.urdf',
+    # try
+    # thread
+    left_arm_chain = ikpy.chain.Chain.from_urdf_file(urdf_file="pr2.urdf",
                                                      base_element_type='link',
                                                      base_elements=[
                                                          "base_link",
@@ -284,32 +286,48 @@ if __name__ == '__main__':
                                                      ],
                                                      active_links_mask=[False, True, True, True, True,
                                                                         False, True, True, False, True,
-                                                                        True, False, True, True, True]
+                                                                        True, False, True, True, False]
                                                      )
 
-    print("left_arm_chain:", left_arm_chain)
-    target_position = [2.87, 0.61, 7.21]
+    motors = []
+    for link in left_arm_chain.links:
+        if link.name != 'Base link' and link.name != "solid_1_solid_2_joint" and \
+                link.name != "solid_4_solid_6_joint" and link.name != "solid_7_solid_8_joint" and \
+                link.name != "l_gripper_joint":
+            # print(link.name)
+            motor = robot.getDevice(link.name)
+            # print(motor)
+            motor.setVelocity(1.0)
+            position_sensor = motor.getPositionSensor()
+            # print(position_sensor)
+            position_sensor.enable(TIME_STEP)
+            motors.append(motor)
+            # print("========================")
+
     IKPY_MAX_ITERATIONS = 4
-    initial_position = [1, 0, 6]
-    position = left_arm_chain.forward_kinematics([0, 0, 0, 0, 0.2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    print("left_arm_chain:", left_arm_chain)
+    print("==========================================")
+
+    position = left_arm_chain.forward_kinematics([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     print("position:", position)
 
     ikResults = left_arm_chain.inverse_kinematics([position[0][3], position[1][3], position[2][3]])
-    # ikResults = left_arm_chain.inverse_kinematics(target_position, max_iter=IKPY_MAX_ITERATIONS,
-    #                                                  initial_position=initial_position)
+    print("iKResult:", ikResults)
 
+    print("==========================================================")
+
+    target_position = [0.48, 1.02, 0.88]
+    print("target position:", target_position)
+    sensor = [m.getPositionSensor().getValue() for m in motors]
+    initial_position = [0] + sensor[0:4] + [0] + sensor[4:6] + [0] + sensor[6:8] + [0] + sensor[8:10] + [0]
+    # print("initial_position:", initial_position)
+    ikResults = left_arm_chain.inverse_kinematics(target_position, max_iter=IKPY_MAX_ITERATIONS,
+                                                  initial_position=initial_position)
     print("ikResults:", ikResults)
+    fw = left_arm_chain.forward_kinematics(ikResults)
+    print("fwResults:", fw)
 
-    # position = left_arm_chain.forward_kinematics([0.00000000e+00, 5.19360893e-02, -2.36179853e-10, 0.00000000e+00,
-    #                                               0.00000000e+00, -2.36179853e-10, 0.00000000e+00, 0.00000000e+00,
-    #                                               0.00000000e+00])
-    # print(position)
-    # ikResults = IK.inverse_kinematic_optimization(chain=left_arm_chain,
-    #                                               starting_nodes_angles=[10, 10, 10, 10, 10, 10, 10, 10, 10, 10],
-    #                                               target_frame=target_position, max_iter=IKPY_MAX_ITERATIONS)
-    # ikResults = left_arm_chain.inverse_kinematics(target_position)
-    # print("2")
-
+    print("===================================================")
     slide = robot.getDevice("torso_lift_joint")
     slide.setPosition(0.1)
     left_finger_motors[LEFT_FINGER].setPosition(10)
@@ -329,7 +347,7 @@ if __name__ == '__main__':
     old_time = 0
     location = [0, 0, 0]
     old_angle = imu.getRollPitchYaw()[2]
-    print("5")
+
     while robot.step(TIME_STEP * 10) != -1:
         wheel_motors[FLL_WHEEL].setPosition(float('Inf'))
         wheel_motors[FLR_WHEEL].setPosition(float('Inf'))
