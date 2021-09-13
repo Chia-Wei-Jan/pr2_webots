@@ -7,7 +7,7 @@ import tempfile
 import ikpy.inverse_kinematics as IK
 import ikpy.chain
 import ikpy.urdf.URDF
-import pathlib
+
 
 TIME_STEP = 16
 
@@ -81,6 +81,9 @@ base_laser_width = 0
 laser_tilt_maxRange = 0
 base_laser_maxRange = 0
 head_tilt_joint_sensor = []
+gps = 0
+imu = 0
+camera = 0
 
 
 def initialize_devices():
@@ -131,6 +134,12 @@ def initialize_devices():
     right_finger_motors.append(robot.getDevice("r_gripper_r_finger_tip_joint"))  # RIGHT_TIP
     for i in range(4):
         right_finger_sensors.append(right_finger_motors[i].getPositionSensor())
+
+    gps = robot.getDevice("gps")
+    gps.enable(TIME_STEP)
+    imu = robot.getDevice("imu_sensor")
+    imu.enable(TIME_STEP)
+    camera = robot.getDevice("camera")
 
     # head_tilt_joint_sensor.append(robot.getPositionSensor("head_tilt_joint_sensor"))
     # head_tilt_joint_sensor[0].enable(TIME_STEP)
@@ -221,10 +230,10 @@ def set_left_arm_position(shoulder_roll, shoulder_lift, upper_arm_roll, elbow_li
 
 
 def lidar_setting():
-    temp = robot.getDevice("base_laser")
-    temp.enable(TIME_STEP)
+    lidar = robot.getDevice("base_laser")
+    lidar.enable(TIME_STEP)
 
-    base_laser_value = temp.getRangeImage()
+    base_laser_value = lidar.getRangeImage()
     print("Lidar => Left:", base_laser_value[639], "Front:", base_laser_value[300], "Right:", base_laser_value[0])
 
     loc = gps.getValues()
@@ -245,12 +254,37 @@ def camara_setting():
     print(cameraData)
 
 
-if __name__ == '__main__':
-    robot = Robot()
-    initialize_devices()
+def calculate(old_time, location, new_location, old_angle):
+    print("new_location: ", new_location)
+    new_time = robot.getTime()
+    new_angle = imu.getRollPitchYaw()[2]
 
-    # try
-    # thread
+    velocity = ((new_location[0] - location[0]) ** 2 + (new_location[2] - location[2]) ** 2) ** 0.5 / (
+            new_time - old_time)
+    if new_angle < 0:
+        new_angle = new_angle + 2 * math.pi
+
+    angle_velocity = (new_angle - old_angle) / (new_time - old_time)
+
+    if abs(new_angle - old_angle) > 1 and new_angle > math.pi:
+        angle_velocity = (new_angle - 2 * math.pi - old_angle) / (new_time - old_time)
+    elif abs(new_angle - old_angle) > 1 and new_angle < math.pi:
+        angle_velocity = (new_angle + 2 * math.pi - old_angle) / (new_time - old_time)
+    else:
+        angle_velocity = (new_angle - old_angle) / (new_time - old_time)
+
+    print("Velocity: ", velocity)
+    print("angle: ", old_angle)
+    print("Angle velocity: ", angle_velocity)
+
+    old_time = new_time
+    location = new_location
+    old_angle = new_angle
+    return old_time, location, old_angle
+
+
+def inverse_kinematics():
+    #try:
     left_arm_chain = ikpy.chain.Chain.from_urdf_file(urdf_file="pr2.urdf",
                                                      base_element_type='link',
                                                      base_elements=[
@@ -286,9 +320,7 @@ if __name__ == '__main__':
                                                      ],
                                                      active_links_mask=[False, True, True, True, True,
                                                                         False, True, True, False, True,
-                                                                        True, False, True, True, False]
-                                                     )
-
+                                                                        True, False, True, True, False])
     motors = []
     for link in left_arm_chain.links:
         if link.name != 'Base link' and link.name != "solid_1_solid_2_joint" and \
@@ -327,23 +359,12 @@ if __name__ == '__main__':
     fw = left_arm_chain.forward_kinematics(ikResults)
     print("fwResults:", fw)
 
-    print("===================================================")
-    slide = robot.getDevice("torso_lift_joint")
-    slide.setPosition(0.1)
-    left_finger_motors[LEFT_FINGER].setPosition(10)
-    left_finger_motors[RIGHT_FINGER].setPosition(10)
+    # except:
+    #     print('IK')
 
-    # camara_setting()
-    camera = robot.getDevice("camera")
-    camera.enable(TIME_STEP)
-    camera.getWidth()
-    camera.getHeight()
 
-    gps = robot.getDevice("gps")
-    gps.enable(TIME_STEP)
-    imu = robot.getDevice("imu_sensor")
-    imu.enable(TIME_STEP)
-
+def run():
+    print("run")
     old_time = 0
     location = [0, 0, 0]
     old_angle = imu.getRollPitchYaw()[2]
@@ -357,7 +378,6 @@ if __name__ == '__main__':
         wheel_motors[BLR_WHEEL].setPosition(float('Inf'))
         wheel_motors[BRL_WHEEL].setPosition(float('Inf'))
         wheel_motors[BRR_WHEEL].setPosition(float('Inf'))
-
         wheel_motors[FLL_WHEEL].setVelocity(50)
         wheel_motors[FLR_WHEEL].setVelocity(50)
         wheel_motors[FRL_WHEEL].setVelocity(50)
@@ -368,40 +388,43 @@ if __name__ == '__main__':
         wheel_motors[BRR_WHEEL].setVelocity(50)
 
         new_location = lidar_setting()
-        print("new_location: ", new_location)
-        new_time = robot.getTime()
-        new_angle = imu.getRollPitchYaw()[2]
-
-        velocity = ((new_location[0] - location[0]) ** 2 + (new_location[2] - location[2]) ** 2) ** 0.5 / (
-                new_time - old_time)
-        if new_angle < 0:
-            new_angle = new_angle + 2 * math.pi
-
-        angle_velocity = (new_angle - old_angle) / (new_time - old_time)
-
-        if abs(new_angle - old_angle) > 1 and new_angle > math.pi:
-            angle_velocity = (new_angle - 2 * math.pi - old_angle) / (new_time - old_time)
-        elif abs(new_angle - old_angle) > 1 and new_angle < math.pi:
-            angle_velocity = (new_angle + 2 * math.pi - old_angle) / (new_time - old_time)
-        else:
-            angle_velocity = (new_angle - old_angle) / (new_time - old_time)
-
-        print("Velocity: ", velocity)
-        print("angle: ", old_angle)
-        print("Angle velocity: ", angle_velocity)
-
-        old_time = new_time
-        location = new_location
-        old_angle = new_angle
-
-        cameraData = camera.getImageArray()
+        old_time, location, old_angle = calculate(old_time, location, new_location, old_angle)
+        # cameraData = camera.getImageArray()
         # print(cameraData)
         print("=================================")
+        if robot.getTime() > 8:
+            break
 
+
+if __name__ == '__main__':
+    robot = Robot()
+    initialize_devices()
+
+    gps = robot.getDevice("gps")
+    gps.enable(TIME_STEP)
+    imu = robot.getDevice("imu_sensor")
+    imu.enable(TIME_STEP)
+    camera = robot.getDevice("camera")
+    camera.enable(TIME_STEP)
+    camera.getWidth()
+    camera.getHeight()
+
+    inverse_kinematics()
+    run()
+    inverse_kinematics()
+
+    set_left_arm_position(10, 10, 10, 10, 10)
+    slide = robot.getDevice("torso_lift_joint")
+    slide.setPosition(0.1)
+    left_finger_motors[LEFT_FINGER].setPosition(10)
+    left_finger_motors[RIGHT_FINGER].setPosition(10)
+
+    # camara_setting()
+    set_left_arm_position(10, 10, 10, 10, 10)
+    # inverse_kinematics()
     # enable_devices()
 
     # set_left_arm_position(10, 10, 10, 10, 10)
     # set_right_arm_position(-10, 10, 10, 10, 10)
-    #
     # set_left_arm_position(0.0, 1.35, 0.0, -2.2, 0.0)
     # set_right_arm_position(0.0, 1.35, 0.0, -2.2, 0.0)
