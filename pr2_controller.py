@@ -8,7 +8,6 @@ import ikpy.inverse_kinematics as IK
 import ikpy.chain
 import ikpy.urdf.URDF
 
-
 TIME_STEP = 16
 
 # PR2 constants
@@ -219,14 +218,27 @@ def set_right_arm_position(shoulder_roll, shoulder_lift, upper_arm_roll, elbow_l
     right_arm_motors[ELBOW_LIFT].setPosition(elbow_lift)
     right_arm_motors[WRIST_ROLL].setPosition(wrist_roll)
 
+    right_arm_motors[SHOULDER_ROLL].setVelocity(10)
+    right_arm_motors[SHOULDER_LIFT].setVelocity(10)
+    right_arm_motors[UPPER_ARM_ROLL].setVelocity(10)
+    right_arm_motors[ELBOW_LIFT].setVelocity(10)
+    right_arm_motors[WRIST_ROLL].setVelocity(10)
+
 
 # Idem for the left arm
 def set_left_arm_position(shoulder_roll, shoulder_lift, upper_arm_roll, elbow_lift, wrist_roll):
+    print("123")
     left_arm_motors[SHOULDER_ROLL].setPosition(shoulder_roll)
     left_arm_motors[SHOULDER_LIFT].setPosition(shoulder_lift)
     left_arm_motors[UPPER_ARM_ROLL].setPosition(upper_arm_roll)
     left_arm_motors[ELBOW_LIFT].setPosition(elbow_lift)
     left_arm_motors[WRIST_ROLL].setPosition(wrist_roll)
+
+    left_arm_motors[SHOULDER_ROLL].setVelocity(10)
+    left_arm_motors[SHOULDER_LIFT].setVelocity(10)
+    left_arm_motors[UPPER_ARM_ROLL].setVelocity(10)
+    left_arm_motors[ELBOW_LIFT].setVelocity(10)
+    left_arm_motors[WRIST_ROLL].setVelocity(10)
 
 
 def lidar_setting():
@@ -284,7 +296,7 @@ def calculate(old_time, location, new_location, old_angle):
 
 
 def inverse_kinematics():
-    #try:
+    # try:
     left_arm_chain = ikpy.chain.Chain.from_urdf_file(urdf_file="pr2.urdf",
                                                      base_element_type='link',
                                                      base_elements=[
@@ -359,8 +371,7 @@ def inverse_kinematics():
     fw = left_arm_chain.forward_kinematics(ikResults)
     print("fwResults:", fw)
 
-    # except:
-    #     print('IK')
+    return ikResults
 
 
 def run():
@@ -369,7 +380,7 @@ def run():
     location = [0, 0, 0]
     old_angle = imu.getRollPitchYaw()[2]
 
-    while robot.step(TIME_STEP * 10) != -1:
+    while robot.step(TIME_STEP) != -1:
         wheel_motors[FLL_WHEEL].setPosition(float('Inf'))
         wheel_motors[FLR_WHEEL].setPosition(float('Inf'))
         wheel_motors[FRL_WHEEL].setPosition(float('Inf'))
@@ -386,6 +397,32 @@ def run():
         wheel_motors[BLR_WHEEL].setVelocity(50)
         wheel_motors[BRL_WHEEL].setVelocity(50)
         wheel_motors[BRR_WHEEL].setVelocity(50)
+
+        # ikResults = inverse_kinematics()
+        # left_arm = []
+        # # 0
+        # left_arm.append(robot.getDevice("torso_lift_joint"))
+        # left_arm.append(robot.getDevice("l_shoulder_pan_joint"))
+        # left_arm.append(robot.getDevice("l_shoulder_lift_joint"))
+        # left_arm.append(robot.getDevice("l_upper_arm_roll_joint"))
+        # # 5
+        # left_arm.append(robot.getDevice("l_elbow_flex_joint"))
+        # left_arm.append(robot.getDevice("l_forearm_roll_joint"))
+        # # 8
+        # left_arm.append(robot.getDevice("l_wrist_flex_joint"))
+        # left_arm.append(robot.getDevice("l_wrist_roll_joint"))
+        # # 11
+        # left_arm.append(robot.getDevice("l_gripper_r_finger_joint"))
+        # left_arm.append(robot.getDevice("l_gripper_r_finger_tip_joint"))
+        # left_arm.append(robot.getDevice("l_gripper_joint"))
+        #
+        # index = 0
+        # for i in range(15):
+        #     if i == 0 or i == 5 or i == 8 or i == 11:
+        #         continue
+        #     left_arm[index].setPosition(ikResults[i])
+        #     left_arm[index].setPosition(30)
+        #     index += 1
 
         new_location = lidar_setting()
         old_time, location, old_angle = calculate(old_time, location, new_location, old_angle)
@@ -409,19 +446,16 @@ if __name__ == '__main__':
     camera.getWidth()
     camera.getHeight()
 
-    inverse_kinematics()
+    # set_left_arm_position(0.0, 1.35, 0.0, -2.2, 0.0)
     run()
-    inverse_kinematics()
-
-    set_left_arm_position(10, 10, 10, 10, 10)
-    slide = robot.getDevice("torso_lift_joint")
-    slide.setPosition(0.1)
-    left_finger_motors[LEFT_FINGER].setPosition(10)
-    left_finger_motors[RIGHT_FINGER].setPosition(10)
+    # slide = robot.getDevice("torso_lift_joint")
+    # slide.setPosition(10)
+    # left_finger_motors[LEFT_FINGER].setPosition(10)
+    # left_finger_motors[RIGHT_FINGER].setPosition(10)
+    # run()
+    # inverse_kinematics()
 
     # camara_setting()
-    set_left_arm_position(10, 10, 10, 10, 10)
-    # inverse_kinematics()
     # enable_devices()
 
     # set_left_arm_position(10, 10, 10, 10, 10)
