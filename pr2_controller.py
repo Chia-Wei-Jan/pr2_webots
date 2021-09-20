@@ -158,7 +158,7 @@ def initialize_devices():
 
 
 def enable_devices():
-    print("Enable device")
+    print("-----------Enable device------------")
     for i in range(8):
         wheel_sensors[i].enable(TIME_STEP)
         # init the motors for speed control
@@ -218,7 +218,7 @@ def stop_wheels():
 
 
 def robot_go_forward(distance):
-    print("Go forward")
+    print("-----------Go forward------------")
     if distance > 0:
         max_wheel_speed = MAX_WHEEL_SPEED
     else:
@@ -244,7 +244,7 @@ def robot_go_forward(distance):
 
 # Idem for the right arm
 def set_right_arm_position(shoulder_roll, shoulder_lift, upper_arm_roll, elbow_lift, wrist_roll, wait_on_feedback):
-    print("Set right arm position")
+    print("------------Set right arm position---------------")
     right_arm_motors[SHOULDER_ROLL].setPosition(shoulder_roll)
     right_arm_motors[SHOULDER_LIFT].setPosition(shoulder_lift)
     right_arm_motors[UPPER_ARM_ROLL].setPosition(upper_arm_roll)
@@ -257,7 +257,7 @@ def set_right_arm_position(shoulder_roll, shoulder_lift, upper_arm_roll, elbow_l
     right_arm_motors[ELBOW_LIFT].setVelocity(10)
     right_arm_motors[WRIST_ROLL].setVelocity(10)
 
-    if(wait_on_feedback):
+    if (wait_on_feedback):
         while not ALMOST_EQUAL(right_arm_sensors[SHOULDER_ROLL].getValue(), shoulder_roll) or \
                 not ALMOST_EQUAL(right_arm_sensors[SHOULDER_LIFT].getValue(), shoulder_lift) or \
                 not ALMOST_EQUAL(right_arm_sensors[UPPER_ARM_ROLL].getValue(), upper_arm_roll) or \
@@ -266,10 +266,9 @@ def set_right_arm_position(shoulder_roll, shoulder_lift, upper_arm_roll, elbow_l
             step()
 
 
-
 # Idem for the left arm
 def set_left_arm_position(shoulder_roll, shoulder_lift, upper_arm_roll, elbow_lift, wrist_roll, wait_on_feedback):
-    print("Set left arm position")
+    print("--------------Set left arm position--------------")
     left_arm_motors[SHOULDER_ROLL].setPosition(shoulder_roll)
     left_arm_motors[SHOULDER_LIFT].setPosition(shoulder_lift)
     left_arm_motors[UPPER_ARM_ROLL].setPosition(upper_arm_roll)
@@ -289,6 +288,64 @@ def set_left_arm_position(shoulder_roll, shoulder_lift, upper_arm_roll, elbow_li
                 not ALMOST_EQUAL(left_arm_sensors[ELBOW_LIFT].getValue(), elbow_lift) or \
                 not ALMOST_EQUAL(left_arm_sensors[WRIST_ROLL].getValue(), wrist_roll):
             step()
+
+
+# Open or close the gripper
+# If wait_on_feedback is true, the gripper is stopped either when the target is reached
+# or when something has been gripped
+def set_gripper(left, open, torqueWhenGripping, wait_on_feedback):
+    print("------------Set Gripper-----------")
+    motors = []
+    sensors = []
+    contacts = []
+
+    motors.append(left_finger_motors[LEFT_FINGER]) if left else motors.append(right_finger_motors[LEFT_FINGER])
+    motors.append(left_finger_motors[RIGHT_FINGER]) if left else motors.append(right_finger_motors[RIGHT_FINGER])
+    motors.append(left_finger_motors[LEFT_TIP]) if left else motors.append(right_finger_motors[LEFT_TIP])
+    motors.append(left_finger_motors[RIGHT_TIP]) if left else motors.append(right_finger_motors[RIGHT_TIP])
+
+    sensors.append(left_finger_sensors[LEFT_FINGER]) if left else sensors.append(right_finger_sensors[LEFT_FINGER])
+    sensors.append(left_finger_sensors[RIGHT_FINGER]) if left else sensors.append(right_finger_sensors[RIGHT_FINGER])
+    sensors.append(left_finger_sensors[LEFT_TIP]) if left else sensors.append(right_finger_sensors[LEFT_TIP])
+    sensors.append(left_finger_sensors[RIGHT_TIP]) if left else sensors.append(right_finger_sensors[RIGHT_TIP])
+
+    contacts.append(left_finger_contact_sensors[LEFT_FINGER]) \
+        if left else contacts.append(right_finger_contact_sensors[LEFT_FINGER])
+    contacts.append(left_finger_contact_sensors[RIGHT_FINGER]) \
+        if left else contacts.append(right_finger_contact_sensors[RIGHT_FINGER])
+
+    firstCall = True
+    maxTorque = 0.0
+    if firstCall:
+        maxTorque = motors[LEFT_FINGER].getAvailableTorque()
+        firstCall = False
+
+    for i in range(4):
+        motors[i].setAvailableTorque(maxTorque)
+
+    if open:
+        target_open_value = 0.5
+        for i in range(4):
+            motors[i].setPosition(target_open_value)
+
+        if wait_on_feedback:
+            while not ALMOST_EQUAL(sensors[LEFT_FINGER].getValue(), target_open_value):
+                step()
+    else:
+        target_close_value = 0.0
+        for i in range(4):
+            motors[i].setPosition(target_close_value)
+
+        if wait_on_feedback:
+            # wait until the 2 touch sensors are fired or the target value is reached
+            while (contacts[LEFT_FINGER].getValue() == 0.0 or contacts[RIGHT_FINGER].getValue() == 0.0) and \
+                    not ALMOST_EQUAL(sensors[LEFT_FINGER].getValue(), target_close_value):
+                step()
+
+            current_position = sensors[LEFT_FINGER].getValue()
+            for i in range(4):
+                motors[i].setAvailableTorque(torqueWhenGripping)
+                motors[i].setPosition(max(0.0, 0.95 * current_position))
 
 
 def lidar_setting():
@@ -342,6 +399,7 @@ def calculate(old_time, location, new_location, old_angle):
 
 
 def inverse_kinematics():
+    print("----------Inverse Kinematics----------")
     left_arm_chain = ikpy.chain.Chain.from_urdf_file(urdf_file="pr2.urdf",
                                                      base_element_type='link',
                                                      base_elements=[
@@ -376,7 +434,7 @@ def inverse_kinematics():
                                                          "solid_9"
                                                      ],
                                                      active_links_mask=[False, True, True, True, True,
-                                                                        False, True, True, False, True,
+                                                                        False, True, False, False, False,
                                                                         True, False, True, True, False])
     motors = []
     for link in left_arm_chain.links:
@@ -416,11 +474,13 @@ def inverse_kinematics():
     fw = left_arm_chain.forward_kinematics(ikResults)
     print("fwResults:", fw)
 
+    set_left_arm_position(ikResults[2], ikResults[3], ikResults[4], ikResults[6], ikResults[10], True)
+
     return ikResults
 
 
 def run():
-    print("run")
+    print("----------run----------")
     old_time = 0
     location = [0, 0, 0]
     old_angle = imu[0].getRollPitchYaw()[2]
@@ -482,19 +542,20 @@ if __name__ == '__main__':
     robot = Robot()
     initialize_devices()
     enable_devices()
+    set_gripper(True, True, 0.0, True)
+    set_gripper(False, True, 0.0, True)
     set_left_arm_position(0.0, 1.35, 0.0, -2.2, 0.0, True)
     robot_go_forward(2)
     set_left_arm_position(0.0, 0, 0.0, 0, 0.0, True)
     # run()
-    # slide = robot.getDevice("torso_lift_joint")
-    # slide.setPosition(10)
-    # left_finger_motors[LEFT_FINGER].setPosition(10)
-    # left_finger_motors[RIGHT_FINGER].setPosition(10)
-    # run()
-    # inverse_kinematics()
-
+    ik = inverse_kinematics()
+    print(ik)
     # camara_setting()
     set_right_arm_position(0.0, 1.35, 0.0, -2.2, 0.0, True)
     set_right_arm_position(0, 0, 0, 0, 0, True)
-    # set_left_arm_position(0.0, 1.35, 0.0, -2.2, 0.0, True)
 
+    set_gripper(True, False, 20.0, True)
+    set_gripper(False, False, 20.0, True)
+    set_gripper(True, True, 0.0, True)
+    set_gripper(False, True, 0.0, True)
+    # set_left_arm_position(0.0, 1.35, 0.0, -2.2, 0.0, True)
