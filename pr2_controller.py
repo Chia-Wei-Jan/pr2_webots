@@ -18,8 +18,7 @@ WHEEL_RADIUS = 0.08  # wheel radius
 
 # function to check if a double is almost equal to another
 TOLERANCE = 0.05  # arbitrary value
-
-# ALMOST_EQUAL(a, b) = ((a < b + TOLERANCE) && (a > b - TOLERANCE))
+# ALMOST_EQUAL(a, b) = ((a < b + TOLERANCE) and (a > b - TOLERANCE))
 
 # helper constants to distinguish the motors
 FLL_WHEEL = 0
@@ -73,16 +72,24 @@ wide_stereo_r_stereo_camera_sensor = []
 high_def_sensor = []
 r_forearm_cam_sensor = []
 l_forearm_cam_sensor = []
-laser_tilt = []
-base_laser = []
 laser_tilt_width = 0
 base_laser_width = 0
 laser_tilt_maxRange = 0
 base_laser_maxRange = 0
 head_tilt_joint_sensor = []
-gps = 0
-imu = 0
-camera = 0
+lidar = []
+gps = []
+imu = []
+camera = []
+
+
+def step():
+    if robot.step(TIME_STEP) == -1:
+        exit(0)
+
+
+def ALMOST_EQUAL(a, b):
+    return (a < b + TOLERANCE) and (a > b - TOLERANCE)
 
 
 def initialize_devices():
@@ -134,40 +141,51 @@ def initialize_devices():
     for i in range(4):
         right_finger_sensors.append(right_finger_motors[i].getPositionSensor())
 
-    gps = robot.getDevice("gps")
-    gps.enable(TIME_STEP)
-    imu = robot.getDevice("imu_sensor")
-    imu.enable(TIME_STEP)
-    camera = robot.getDevice("camera")
+    head_tilt_motor.append(robot.getDevice("head_tilt_joint"))
+    torso_motor.append(robot.getDevice("torso_lift_joint"))
+    torso_sensor.append(robot.getDevice("torso_lift_joint_sensor"))
 
-    # head_tilt_joint_sensor.append(robot.getPositionSensor("head_tilt_joint_sensor"))
-    # head_tilt_joint_sensor[0].enable(TIME_STEP)
-    # head_tilt_motor.append(robot.getDevice("head_tilt_joint"))
-    # torso_motor.append(robot.getMotor("torso_lift_joint"))
-    # torso_sensor.append(robot.getMotor("torso_lift_joint_sensor"))
+    left_finger_contact_sensors.append(robot.getDevice("l_gripper_l_finger_tip_contact_sensor"))  # LEFT_FINGER
+    left_finger_contact_sensors.append(robot.getDevice("l_gripper_r_finger_tip_contact_sensor"))  # RIGHT_FINGER
+    right_finger_contact_sensors.append(robot.getDevice("r_gripper_l_finger_tip_contact_sensor"))  # LEFT_FINGER
+    right_finger_contact_sensors.append(robot.getDevice("r_gripper_r_finger_tip_contact_sensor"))  # RIGHT_FINGER
 
-    # left_finger_contact_sensors.append(robot.getMotor("l_gripper_l_finger_tip_contact_sensor"))  # LEFT_FINGER
-    # left_finger_contact_sensors.append(robot.getMotor("l_gripper_r_finger_tip_contact_sensor"))  # RIGHT_FINGER
-    # right_finger_contact_sensors.append(robot.getMotor("r_gripper_l_finger_tip_contact_sensor"))  # LEFT_FINGER
-    # right_finger_contact_sensors.append(robot.getMotor("r_gripper_r_finger_tip_contact_sensor"))  # RIGHT_FINGER
-    # print(right_finger_contact_sensors[0])
-    # # imu_sensor.append(Robot.getMotor("imu_sensor"))
-
-    # laser_tilt.append(robot.getLidar("laser_tilt"))
-    # base_laser.append(robot.getLidar("base_laser"))
+    # imu_sensor.append(Robot.getMotor("imu_sensor"))
+    lidar.append(robot.getDevice("base_laser"))
+    gps.append(robot.getDevice("gps"))
+    imu.append(robot.getDevice("imu_sensor"))
+    camera.append(robot.getDevice("camera"))
 
 
-# def enable_devices():
-#     print("Enable device")
-#     laser_tilt[0].enable(TIME_STEP)
-#     base_laser[0].enable(TIME_STEP)
-#     laser_tilt[0].enablePointCloud
-#     base_laser[0].enablePointCloud
-#     laser_tilt_width = laser_tilt[0].getHorizontalResolution
-#     base_laser_width = base_laser[0].getHorizontalResolution
-#     laser_tilt_maxRange = laser_tilt[0].getMaxRange
-#     base_laser_maxRange = base_laser[0].getMaxRange
-#     print(base_laser_maxRange)
+def enable_devices():
+    print("Enable device")
+    for i in range(8):
+        wheel_sensors[i].enable(TIME_STEP)
+        # init the motors for speed control
+        wheel_motors[i].setPosition(float('Inf'))
+        wheel_motors[i].setVelocity(0.0)
+
+    for i in range(4):
+        rotation_sensors[i].enable(TIME_STEP)
+
+    for i in range(2):
+        left_finger_contact_sensors[i].enable(TIME_STEP)
+        right_finger_contact_sensors[i].enable(TIME_STEP)
+
+    for i in range(4):
+        left_finger_sensors[i].enable(TIME_STEP)
+        right_finger_sensors[i].enable(TIME_STEP)
+
+    for i in range(5):
+        left_arm_sensors[i].enable(TIME_STEP)
+        right_arm_sensors[i].enable(TIME_STEP)
+
+    torso_sensor[0].enable(TIME_STEP)
+    lidar[0].enable(TIME_STEP)
+    lidar[0].enablePointCloud()
+    gps[0].enable(TIME_STEP)
+    imu[0].enable(TIME_STEP)
+    camera[0].enable(TIME_STEP)
 
 
 # set the speeds of the robot wheels
@@ -192,7 +210,6 @@ def set_wheels_speeds(fll, flr, frl, frr, bll, blr, brl, brr):
 
 
 def set_wheels_speed(speed):
-    print("Set speed")
     set_wheels_speeds(speed, speed, speed, speed, speed, speed, speed, speed)
 
 
@@ -208,10 +225,26 @@ def robot_go_forward(distance):
         max_wheel_speed = -MAX_WHEEL_SPEED
 
     set_wheels_speed(max_wheel_speed)
+    initial_wheel0_position = wheel_sensors[FLL_WHEEL].getValue()
+
+    while True:
+        wheel0_position = wheel_sensors[FLL_WHEEL].getValue()
+        # travel distance by the wheel
+        wheel0_travel_distance = math.fabs(WHEEL_RADIUS * (wheel0_position - initial_wheel0_position))
+
+        if wheel0_travel_distance > math.fabs(distance):
+            break
+
+        # reduce the speed before reaching the target
+        if math.fabs(distance) - wheel0_travel_distance < 0.025:
+            set_wheels_speed(0.1 * max_wheel_speed)
+
+        step()
 
 
 # Idem for the right arm
-def set_right_arm_position(shoulder_roll, shoulder_lift, upper_arm_roll, elbow_lift, wrist_roll):
+def set_right_arm_position(shoulder_roll, shoulder_lift, upper_arm_roll, elbow_lift, wrist_roll, wait_on_feedback):
+    print("Set right arm position")
     right_arm_motors[SHOULDER_ROLL].setPosition(shoulder_roll)
     right_arm_motors[SHOULDER_LIFT].setPosition(shoulder_lift)
     right_arm_motors[UPPER_ARM_ROLL].setPosition(upper_arm_roll)
@@ -224,10 +257,19 @@ def set_right_arm_position(shoulder_roll, shoulder_lift, upper_arm_roll, elbow_l
     right_arm_motors[ELBOW_LIFT].setVelocity(10)
     right_arm_motors[WRIST_ROLL].setVelocity(10)
 
+    if(wait_on_feedback):
+        while not ALMOST_EQUAL(right_arm_sensors[SHOULDER_ROLL].getValue(), shoulder_roll) or \
+                not ALMOST_EQUAL(right_arm_sensors[SHOULDER_LIFT].getValue(), shoulder_lift) or \
+                not ALMOST_EQUAL(right_arm_sensors[UPPER_ARM_ROLL].getValue(), upper_arm_roll) or \
+                not ALMOST_EQUAL(right_arm_sensors[ELBOW_LIFT].getValue(), elbow_lift) or \
+                not ALMOST_EQUAL(right_arm_sensors[WRIST_ROLL].getValue(), wrist_roll):
+            step()
+
+
 
 # Idem for the left arm
-def set_left_arm_position(shoulder_roll, shoulder_lift, upper_arm_roll, elbow_lift, wrist_roll):
-    print("123")
+def set_left_arm_position(shoulder_roll, shoulder_lift, upper_arm_roll, elbow_lift, wrist_roll, wait_on_feedback):
+    print("Set left arm position")
     left_arm_motors[SHOULDER_ROLL].setPosition(shoulder_roll)
     left_arm_motors[SHOULDER_LIFT].setPosition(shoulder_lift)
     left_arm_motors[UPPER_ARM_ROLL].setPosition(upper_arm_roll)
@@ -240,15 +282,20 @@ def set_left_arm_position(shoulder_roll, shoulder_lift, upper_arm_roll, elbow_li
     left_arm_motors[ELBOW_LIFT].setVelocity(10)
     left_arm_motors[WRIST_ROLL].setVelocity(10)
 
+    if wait_on_feedback:
+        while not ALMOST_EQUAL(left_arm_sensors[SHOULDER_ROLL].getValue(), shoulder_roll) or \
+                not ALMOST_EQUAL(left_arm_sensors[SHOULDER_LIFT].getValue(), shoulder_lift) or \
+                not ALMOST_EQUAL(left_arm_sensors[UPPER_ARM_ROLL].getValue(), upper_arm_roll) or \
+                not ALMOST_EQUAL(left_arm_sensors[ELBOW_LIFT].getValue(), elbow_lift) or \
+                not ALMOST_EQUAL(left_arm_sensors[WRIST_ROLL].getValue(), wrist_roll):
+            step()
+
 
 def lidar_setting():
-    lidar = robot.getDevice("base_laser")
-    lidar.enable(TIME_STEP)
-
-    base_laser_value = lidar.getRangeImage()
+    base_laser_value = lidar[0].getRangeImage()
     print("Lidar => Left:", base_laser_value[639], "Front:", base_laser_value[300], "Right:", base_laser_value[0])
 
-    loc = gps.getValues()
+    loc = gps[0].getValues()
 
     RFID = []
     for i in range(0, 640, 10):
@@ -261,15 +308,14 @@ def lidar_setting():
 
 
 def camara_setting():
-    # print(camera.getWidth(), camera.getHeight())
-    cameraData = camera.getImageArray()
+    cameraData = camera[0].getImageArray()
     print(cameraData)
 
 
 def calculate(old_time, location, new_location, old_angle):
     print("new_location: ", new_location)
     new_time = robot.getTime()
-    new_angle = imu.getRollPitchYaw()[2]
+    new_angle = imu[0].getRollPitchYaw()[2]
 
     velocity = ((new_location[0] - location[0]) ** 2 + (new_location[2] - location[2]) ** 2) ** 0.5 / (
             new_time - old_time)
@@ -296,7 +342,6 @@ def calculate(old_time, location, new_location, old_angle):
 
 
 def inverse_kinematics():
-    # try:
     left_arm_chain = ikpy.chain.Chain.from_urdf_file(urdf_file="pr2.urdf",
                                                      base_element_type='link',
                                                      base_elements=[
@@ -378,7 +423,7 @@ def run():
     print("run")
     old_time = 0
     location = [0, 0, 0]
-    old_angle = imu.getRollPitchYaw()[2]
+    old_angle = imu[0].getRollPitchYaw()[2]
 
     while robot.step(TIME_STEP) != -1:
         wheel_motors[FLL_WHEEL].setPosition(float('Inf'))
@@ -436,18 +481,11 @@ def run():
 if __name__ == '__main__':
     robot = Robot()
     initialize_devices()
-
-    gps = robot.getDevice("gps")
-    gps.enable(TIME_STEP)
-    imu = robot.getDevice("imu_sensor")
-    imu.enable(TIME_STEP)
-    camera = robot.getDevice("camera")
-    camera.enable(TIME_STEP)
-    camera.getWidth()
-    camera.getHeight()
-
-    # set_left_arm_position(0.0, 1.35, 0.0, -2.2, 0.0)
-    run()
+    enable_devices()
+    set_left_arm_position(0.0, 1.35, 0.0, -2.2, 0.0, True)
+    robot_go_forward(2)
+    set_left_arm_position(0.0, 0, 0.0, 0, 0.0, True)
+    # run()
     # slide = robot.getDevice("torso_lift_joint")
     # slide.setPosition(10)
     # left_finger_motors[LEFT_FINGER].setPosition(10)
@@ -456,9 +494,7 @@ if __name__ == '__main__':
     # inverse_kinematics()
 
     # camara_setting()
-    # enable_devices()
+    set_right_arm_position(0.0, 1.35, 0.0, -2.2, 0.0, True)
+    set_right_arm_position(0, 0, 0, 0, 0, True)
+    # set_left_arm_position(0.0, 1.35, 0.0, -2.2, 0.0, True)
 
-    # set_left_arm_position(10, 10, 10, 10, 10)
-    # set_right_arm_position(-10, 10, 10, 10, 10)
-    # set_left_arm_position(0.0, 1.35, 0.0, -2.2, 0.0)
-    # set_right_arm_position(0.0, 1.35, 0.0, -2.2, 0.0)
