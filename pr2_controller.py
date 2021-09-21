@@ -463,7 +463,10 @@ def inverse_kinematics():
 
     print("==========================================================")
 
-    target_position = [0.48, 1.02, 0.88]
+    can = [5.16, 0.543, 4.58]
+    robot_position = [5.15, -0.0136, 3.7]
+    target_position = [can[2] - robot_position[2] + 0.2, can[0] - robot_position[0], can[1] - robot_position[1]]
+    # target_position = [0.48, 1.02, 0.88]
     print("target position:", target_position)
     sensor = [m.getPositionSensor().getValue() for m in motors]
     initial_position = [0] + sensor[0:4] + [0] + sensor[4:6] + [0] + sensor[6:8] + [0] + sensor[8:10] + [0]
@@ -473,8 +476,6 @@ def inverse_kinematics():
     print("ikResults:", ikResults)
     fw = left_arm_chain.forward_kinematics(ikResults)
     print("fwResults:", fw)
-
-    set_left_arm_position(ikResults[2], ikResults[3], ikResults[4], ikResults[6], ikResults[10], True)
 
     return ikResults
 
@@ -503,32 +504,6 @@ def run():
         wheel_motors[BRL_WHEEL].setVelocity(50)
         wheel_motors[BRR_WHEEL].setVelocity(50)
 
-        # ikResults = inverse_kinematics()
-        # left_arm = []
-        # # 0
-        # left_arm.append(robot.getDevice("torso_lift_joint"))
-        # left_arm.append(robot.getDevice("l_shoulder_pan_joint"))
-        # left_arm.append(robot.getDevice("l_shoulder_lift_joint"))
-        # left_arm.append(robot.getDevice("l_upper_arm_roll_joint"))
-        # # 5
-        # left_arm.append(robot.getDevice("l_elbow_flex_joint"))
-        # left_arm.append(robot.getDevice("l_forearm_roll_joint"))
-        # # 8
-        # left_arm.append(robot.getDevice("l_wrist_flex_joint"))
-        # left_arm.append(robot.getDevice("l_wrist_roll_joint"))
-        # # 11
-        # left_arm.append(robot.getDevice("l_gripper_r_finger_joint"))
-        # left_arm.append(robot.getDevice("l_gripper_r_finger_tip_joint"))
-        # left_arm.append(robot.getDevice("l_gripper_joint"))
-        #
-        # index = 0
-        # for i in range(15):
-        #     if i == 0 or i == 5 or i == 8 or i == 11:
-        #         continue
-        #     left_arm[index].setPosition(ikResults[i])
-        #     left_arm[index].setPosition(30)
-        #     index += 1
-
         new_location = lidar_setting()
         old_time, location, old_angle = calculate(old_time, location, new_location, old_angle)
         # cameraData = camera.getImageArray()
@@ -544,18 +519,19 @@ if __name__ == '__main__':
     enable_devices()
     set_gripper(True, True, 0.0, True)
     set_gripper(False, True, 0.0, True)
-    set_left_arm_position(0.0, 1.35, 0.0, -2.2, 0.0, True)
-    robot_go_forward(2)
+    # set_left_arm_position(0.0, 1.35, 0.0, -2.2, 0.0, True)
+    # robot_go_forward(2)
     set_left_arm_position(0.0, 0, 0.0, 0, 0.0, True)
     # run()
-    ik = inverse_kinematics()
-    print(ik)
-    # camara_setting()
-    set_right_arm_position(0.0, 1.35, 0.0, -2.2, 0.0, True)
-    set_right_arm_position(0, 0, 0, 0, 0, True)
+    ikResults = inverse_kinematics()
+    set_left_arm_position(ikResults[2], ikResults[3], ikResults[4], ikResults[6], ikResults[10], True)
 
     set_gripper(True, False, 20.0, True)
     set_gripper(False, False, 20.0, True)
-    set_gripper(True, True, 0.0, True)
-    set_gripper(False, True, 0.0, True)
+    # camara_setting()
+    # set_right_arm_position(0.0, 1.35, 0.0, -2.2, 0.0, True)
+    # set_right_arm_position(0, 0, 0, 0, 0, True)
+
+    # set_gripper(True, True, 0.0, True)
+    # set_gripper(False, True, 0.0, True)
     # set_left_arm_position(0.0, 1.35, 0.0, -2.2, 0.0, True)
