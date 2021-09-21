@@ -464,9 +464,8 @@ def inverse_kinematics():
     print("==========================================================")
 
     can = [5.16, 0.543, 4.58]
-    robot_position = [5.15, -0.0136, 3.7]
+    robot_position = [4.53, -0.0136, 3.65]
     target_position = [can[2] - robot_position[2] + 0.2, can[0] - robot_position[0], can[1] - robot_position[1]]
-    # target_position = [0.48, 1.02, 0.88]
     print("target position:", target_position)
     sensor = [m.getPositionSensor().getValue() for m in motors]
     initial_position = [0] + sensor[0:4] + [0] + sensor[4:6] + [0] + sensor[6:8] + [0] + sensor[8:10] + [0]
