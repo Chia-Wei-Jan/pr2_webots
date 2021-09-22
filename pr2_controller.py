@@ -398,6 +398,39 @@ def calculate(old_time, location, new_location, old_angle):
     return old_time, location, old_angle
 
 
+def run():
+    print("----------run----------")
+    old_time = 0
+    location = [0, 0, 0]
+    old_angle = imu[0].getRollPitchYaw()[2]
+
+    while robot.step(TIME_STEP) != -1:
+        wheel_motors[FLL_WHEEL].setPosition(float('Inf'))
+        wheel_motors[FLR_WHEEL].setPosition(float('Inf'))
+        wheel_motors[FRL_WHEEL].setPosition(float('Inf'))
+        wheel_motors[FRR_WHEEL].setPosition(float('Inf'))
+        wheel_motors[BLL_WHEEL].setPosition(float('Inf'))
+        wheel_motors[BLR_WHEEL].setPosition(float('Inf'))
+        wheel_motors[BRL_WHEEL].setPosition(float('Inf'))
+        wheel_motors[BRR_WHEEL].setPosition(float('Inf'))
+        wheel_motors[FLL_WHEEL].setVelocity(50)
+        wheel_motors[FLR_WHEEL].setVelocity(50)
+        wheel_motors[FRL_WHEEL].setVelocity(50)
+        wheel_motors[FRR_WHEEL].setVelocity(50)
+        wheel_motors[BLL_WHEEL].setVelocity(50)
+        wheel_motors[BLR_WHEEL].setVelocity(50)
+        wheel_motors[BRL_WHEEL].setVelocity(50)
+        wheel_motors[BRR_WHEEL].setVelocity(50)
+
+        new_location = lidar_setting()
+        old_time, location, old_angle = calculate(old_time, location, new_location, old_angle)
+        # cameraData = camera.getImageArray()
+        # print(cameraData)
+        print("=================================")
+        if robot.getTime() > 8:
+            break
+
+
 def inverse_kinematics():
     print("----------Inverse Kinematics----------")
     left_arm_chain = ikpy.chain.Chain.from_urdf_file(urdf_file="pr2.urdf",
@@ -464,8 +497,10 @@ def inverse_kinematics():
     print("==========================================================")
 
     can = [5.16, 0.543, 4.58]
-    robot_position = [4.53, -0.0136, 3.65]
-    target_position = [can[2] - robot_position[2] + 0.2, can[0] - robot_position[0], can[1] - robot_position[1]]
+    robot_position = gps_base.getValues()
+    print("robot_position", robot_position)
+    # robot_position = [4.53, -0.0136, 3.65]
+    target_position = [can[2] - robot_position[2], can[0] - robot_position[0], can[1] - robot_position[1]]
     print("target position:", target_position)
     sensor = [m.getPositionSensor().getValue() for m in motors]
     initial_position = [0] + sensor[0:4] + [0] + sensor[4:6] + [0] + sensor[6:8] + [0] + sensor[8:10] + [0]
@@ -479,49 +514,30 @@ def inverse_kinematics():
     return ikResults
 
 
-def run():
-    print("----------run----------")
-    old_time = 0
-    location = [0, 0, 0]
-    old_angle = imu[0].getRollPitchYaw()[2]
-
-    while robot.step(TIME_STEP) != -1:
-        wheel_motors[FLL_WHEEL].setPosition(float('Inf'))
-        wheel_motors[FLR_WHEEL].setPosition(float('Inf'))
-        wheel_motors[FRL_WHEEL].setPosition(float('Inf'))
-        wheel_motors[FRR_WHEEL].setPosition(float('Inf'))
-        wheel_motors[BLL_WHEEL].setPosition(float('Inf'))
-        wheel_motors[BLR_WHEEL].setPosition(float('Inf'))
-        wheel_motors[BRL_WHEEL].setPosition(float('Inf'))
-        wheel_motors[BRR_WHEEL].setPosition(float('Inf'))
-        wheel_motors[FLL_WHEEL].setVelocity(50)
-        wheel_motors[FLR_WHEEL].setVelocity(50)
-        wheel_motors[FRL_WHEEL].setVelocity(50)
-        wheel_motors[FRR_WHEEL].setVelocity(50)
-        wheel_motors[BLL_WHEEL].setVelocity(50)
-        wheel_motors[BLR_WHEEL].setVelocity(50)
-        wheel_motors[BRL_WHEEL].setVelocity(50)
-        wheel_motors[BRR_WHEEL].setVelocity(50)
-
-        new_location = lidar_setting()
-        old_time, location, old_angle = calculate(old_time, location, new_location, old_angle)
-        # cameraData = camera.getImageArray()
-        # print(cameraData)
-        print("=================================")
-        if robot.getTime() > 8:
-            break
-
-
 if __name__ == '__main__':
     robot = Robot()
     initialize_devices()
     enable_devices()
+
+    gps_finger = robot.getDevice("gps_finger")
+    gps_base = robot.getDevice("gps_base")
+    gps_finger.enable(TIME_STEP)
+    gps_base.enable(TIME_STEP)
+    x = [0.939, 0.173, 0.74]
+    finger_position = gps_finger.getValues()
+    print(finger_position)
+    base_position = gps_base.getValues()
+    # base_position = [finger_position[0] - x[0], finger_position[1] - x[1], finger_position[2] - x[2]]
+    print(base_position)
+    print("minus", finger_position[0] - base_position[0], finger_position[1] - base_position[1],
+          finger_position[2] - base_position[2])
     set_gripper(True, True, 0.0, True)
     set_gripper(False, True, 0.0, True)
     # set_left_arm_position(0.0, 1.35, 0.0, -2.2, 0.0, True)
     # robot_go_forward(2)
     set_left_arm_position(0.0, 0, 0.0, 0, 0.0, True)
     # run()
+    # print(gps[0].getValues())
     ikResults = inverse_kinematics()
     set_left_arm_position(ikResults[2], ikResults[3], ikResults[4], ikResults[6], ikResults[10], True)
 
