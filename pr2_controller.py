@@ -39,7 +39,9 @@ SHOULDER_ROLL = 0
 SHOULDER_LIFT = 1
 UPPER_ARM_ROLL = 2
 ELBOW_LIFT = 3
-WRIST_ROLL = 4
+FOREARM_ROLL = 4
+WRIST_FLEX = 5
+WRIST_ROLL = 6
 
 LEFT_FINGER = 0
 RIGHT_FINGER = 1
@@ -115,16 +117,20 @@ def initialize_devices():
     left_arm_motors.append(robot.getDevice("l_shoulder_lift_joint"))  # SHOULDER_LIFT
     left_arm_motors.append(robot.getDevice("l_upper_arm_roll_joint"))  # UPPER_ARM_ROLL
     left_arm_motors.append(robot.getDevice("l_elbow_flex_joint"))  # ELBOW_LIFT
+    left_arm_motors.append(robot.getDevice("l_forearm_roll_joint"))  # FOREARM_ROLL
+    left_arm_motors.append(robot.getDevice("l_wrist_flex_joint"))  # WRIST_FLEX
     left_arm_motors.append(robot.getDevice("l_wrist_roll_joint"))  # WRIST_ROLL
-    for i in range(5):
+    for i in range(7):
         left_arm_sensors.append(left_arm_motors[i].getPositionSensor())
 
     right_arm_motors.append(robot.getDevice("r_shoulder_pan_joint"))  # SHOULDER_ROLL
     right_arm_motors.append(robot.getDevice("r_shoulder_lift_joint"))  # SHOULDER_LIFT
     right_arm_motors.append(robot.getDevice("r_upper_arm_roll_joint"))  # UPPER_ARM_ROLL
     right_arm_motors.append(robot.getDevice("r_elbow_flex_joint"))  # ELBOW_LIFT
+    right_arm_motors.append(robot.getDevice("l_forearm_roll_joint"))  # FOREARM_ROLL
+    right_arm_motors.append(robot.getDevice("l_wrist_flex_joint"))  # WRIST_FLEX
     right_arm_motors.append(robot.getDevice("r_wrist_roll_joint"))  # WRIST_ROLL
-    for i in range(5):
+    for i in range(7):
         right_arm_sensors.append(right_arm_motors[i].getPositionSensor())
 
     left_finger_motors.append(robot.getDevice("l_gripper_l_finger_joint"))  # LEFT_FINGER
@@ -176,7 +182,7 @@ def enable_devices():
         left_finger_sensors[i].enable(TIME_STEP)
         right_finger_sensors[i].enable(TIME_STEP)
 
-    for i in range(5):
+    for i in range(7):
         left_arm_sensors[i].enable(TIME_STEP)
         right_arm_sensors[i].enable(TIME_STEP)
 
@@ -243,7 +249,8 @@ def robot_go_forward(distance):
 
 
 # Idem for the right arm
-def set_right_arm_position(shoulder_roll, shoulder_lift, upper_arm_roll, elbow_lift, wrist_roll, wait_on_feedback):
+def set_right_arm_position(shoulder_roll, shoulder_lift, upper_arm_roll, elbow_lift, forearm_roll, wrist_flex,
+                           wrist_roll, wait_on_feedback):
     print("------------Set right arm position---------------")
     right_arm_motors[SHOULDER_ROLL].setPosition(shoulder_roll)
     right_arm_motors[SHOULDER_LIFT].setPosition(shoulder_lift)
@@ -267,18 +274,22 @@ def set_right_arm_position(shoulder_roll, shoulder_lift, upper_arm_roll, elbow_l
 
 
 # Idem for the left arm
-def set_left_arm_position(shoulder_roll, shoulder_lift, upper_arm_roll, elbow_lift, wrist_roll, wait_on_feedback):
+def set_left_arm_position(shoulder_roll, shoulder_lift, upper_arm_roll, elbow_lift, forearm_roll, wrist_flex,
+                          wrist_roll, wait_on_feedback):
     print("--------------Set left arm position--------------")
     left_arm_motors[SHOULDER_ROLL].setPosition(shoulder_roll)
     left_arm_motors[SHOULDER_LIFT].setPosition(shoulder_lift)
     left_arm_motors[UPPER_ARM_ROLL].setPosition(upper_arm_roll)
     left_arm_motors[ELBOW_LIFT].setPosition(elbow_lift)
+    left_arm_motors[FOREARM_ROLL].setPosition(forearm_roll)
+    left_arm_motors[WRIST_FLEX].setPosition(wrist_flex)
     left_arm_motors[WRIST_ROLL].setPosition(wrist_roll)
 
     left_arm_motors[SHOULDER_ROLL].setVelocity(10)
     left_arm_motors[SHOULDER_LIFT].setVelocity(10)
     left_arm_motors[UPPER_ARM_ROLL].setVelocity(10)
-    left_arm_motors[ELBOW_LIFT].setVelocity(10)
+    left_arm_motors[FOREARM_ROLL].setVelocity(10)
+    left_arm_motors[WRIST_FLEX].setVelocity(10)
     left_arm_motors[WRIST_ROLL].setVelocity(10)
 
     if wait_on_feedback:
@@ -286,6 +297,8 @@ def set_left_arm_position(shoulder_roll, shoulder_lift, upper_arm_roll, elbow_li
                 not ALMOST_EQUAL(left_arm_sensors[SHOULDER_LIFT].getValue(), shoulder_lift) or \
                 not ALMOST_EQUAL(left_arm_sensors[UPPER_ARM_ROLL].getValue(), upper_arm_roll) or \
                 not ALMOST_EQUAL(left_arm_sensors[ELBOW_LIFT].getValue(), elbow_lift) or \
+                not ALMOST_EQUAL(left_arm_sensors[FOREARM_ROLL].getValue(), forearm_roll) or \
+                not ALMOST_EQUAL(left_arm_sensors[WRIST_FLEX].getValue(), wrist_flex) or \
                 not ALMOST_EQUAL(left_arm_sensors[WRIST_ROLL].getValue(), wrist_roll):
             step()
 
@@ -485,11 +498,11 @@ def inverse_kinematics():
             # print("========================")
 
     IKPY_MAX_ITERATIONS = 4
-    print("left_arm_chain:", left_arm_chain)
-    print("==========================================")
+    # print("left_arm_chain:", left_arm_chain)
+    # print("==========================================")
 
     position = left_arm_chain.forward_kinematics([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-    print("position:", position)
+    print("fwResults:", position)
 
     ikResults = left_arm_chain.inverse_kinematics([position[0][3], position[1][3], position[2][3]])
     print("iKResult:", ikResults)
@@ -523,26 +536,31 @@ if __name__ == '__main__':
     gps_base = robot.getDevice("gps_base")
     gps_finger.enable(TIME_STEP)
     gps_base.enable(TIME_STEP)
+
     x = [0.939, 0.173, 0.74]
     finger_position = gps_finger.getValues()
-    print(finger_position)
+    print("finger position:", finger_position)
     base_position = gps_base.getValues()
     # base_position = [finger_position[0] - x[0], finger_position[1] - x[1], finger_position[2] - x[2]]
-    print(base_position)
-    print("minus", finger_position[0] - base_position[0], finger_position[1] - base_position[1],
+    print("base position:", base_position)
+    print("minus:", finger_position[0] - base_position[0], finger_position[1] - base_position[1],
           finger_position[2] - base_position[2])
+
+    set_left_arm_position(0, 0, 0, 0, 0, 0, 0, True)
     set_gripper(True, True, 0.0, True)
     set_gripper(False, True, 0.0, True)
-    # set_left_arm_position(0.0, 1.35, 0.0, -2.2, 0.0, True)
+    # set_left_arm_position(0.0, 1.35, 0.0, -2.2, 0, 0, 0.0, True)
     # robot_go_forward(2)
-    set_left_arm_position(0.0, 0, 0.0, 0, 0.0, True)
     # run()
-    # print(gps[0].getValues())
     ikResults = inverse_kinematics()
-    set_left_arm_position(ikResults[2], ikResults[3], ikResults[4], ikResults[6], ikResults[10], True)
+    set_left_arm_position(ikResults[2], ikResults[3], ikResults[4], ikResults[6],
+                          ikResults[7], ikResults[9], ikResults[10], True)
 
     set_gripper(True, False, 20.0, True)
     set_gripper(False, False, 20.0, True)
+    robot_go_forward(-1)
+    set_gripper(True, True, 0.0, True)
+    set_gripper(True, False, 20.0, True)
     # camara_setting()
     # set_right_arm_position(0.0, 1.35, 0.0, -2.2, 0.0, True)
     # set_right_arm_position(0, 0, 0, 0, 0, True)
