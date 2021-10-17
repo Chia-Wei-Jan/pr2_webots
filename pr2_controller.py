@@ -7,8 +7,11 @@ import tempfile
 import ikpy.inverse_kinematics as IK
 import ikpy.chain
 import ikpy.urdf.URDF
+import pandas as pd
+import xlsxwriter
+from openpyxl import Workbook, load_workbook
 
-TIME_STEP = 16
+TIME_STEP = 16 * 2
 
 # PR2 constants
 MAX_WHEEL_SPEED = 3.0  # maximum velocity for the wheels [rad / s]
@@ -196,15 +199,6 @@ def enable_devices():
 
 # set the speeds of the robot wheels
 def set_wheels_speeds(fll, flr, frl, frr, bll, blr, brl, brr):
-    wheel_motors[FLL_WHEEL].setPosition(float('Inf'))
-    wheel_motors[FLR_WHEEL].setPosition(float('Inf'))
-    wheel_motors[FRL_WHEEL].setPosition(float('Inf'))
-    wheel_motors[FRR_WHEEL].setPosition(float('Inf'))
-    wheel_motors[BLL_WHEEL].setPosition(float('Inf'))
-    wheel_motors[BLR_WHEEL].setPosition(float('Inf'))
-    wheel_motors[BRL_WHEEL].setPosition(float('Inf'))
-    wheel_motors[BRR_WHEEL].setPosition(float('Inf'))
-
     wheel_motors[FLL_WHEEL].setVelocity(fll)
     wheel_motors[FLR_WHEEL].setVelocity(flr)
     wheel_motors[FRL_WHEEL].setVelocity(frl)
@@ -223,12 +217,88 @@ def stop_wheels():
     set_wheels_speeds(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
 
+# enable/disable the torques on the wheels motors
+def enable_passive_wheels(enable):
+    torques = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+    if enable:
+        for i in range(8):
+            torques[i] = wheel_motors[i].getAvailableTorque()
+            wheel_motors[i].setAvailableTorque(0.0)
+    else:
+        for i in range(8):
+            wheel_motors[i].setAvailableTorque(torques[i])
+
+
+# Set the rotation wheels angles.
+# If wait_on_feedback is true, the function is left when the rotational motors have reached their target positions.
+def set_rotation_wheels_angles(fl, fr, bl, br, wait_on_feedback):
+    if wait_on_feedback:
+        enable_passive_wheels(True)
+
+    rotation_motors[FL_ROTATION].setPosition(fl)
+    rotation_motors[FR_ROTATION].setPosition(fr)
+    rotation_motors[BL_ROTATION].setPosition(bl)
+    rotation_motors[BR_ROTATION].setPosition(br)
+
+    if wait_on_feedback:
+        target = [fl, fr, bl, br]
+
+        while True:
+            all_reached = True
+            for i in range(4):
+                current_position = rotation_sensors[i].getValue()
+                if not ALMOST_EQUAL(current_position, target[i]):
+                    all_reached = False
+                    break
+
+            if all_reached:
+                break
+            else:
+                step()
+
+        enable_passive_wheels(False)
+
+
+# High level function to rotate the robot around itself of a given angle [rad]
+# Note: the angle can be negative
+def robot_rotate(angle):
+    print("-------------robot rotate---------------")
+    stop_wheels()
+
+    set_rotation_wheels_angles(3.0 * math.pi / 4, math.pi / 4, -3.0 * math.pi / 4, -math.pi / 4, True)
+    max_wheel_speed = MAX_WHEEL_SPEED if angle > 0 else -MAX_WHEEL_SPEED
+    set_wheels_speed(max_wheel_speed)
+
+    initial_wheel0_position = wheel_sensors[FLL_WHEEL].getValue()
+    print(initial_wheel0_position)
+    # expect travel distance done by the wheel
+    expected_travel_distance = math.fabs(angle * 0.5 * (WHEELS_DISTANCE + SUB_WHEELS_DISTANCE))
+
+    while True:
+        wheel0_position = wheel_sensors[FLL_WHEEL].getValue()
+        print("wheel0_position:", wheel0_position)
+        # travel distance done by the wheel
+        wheel0_travel_distance = math.fabs(WHEEL_RADIUS * (wheel0_position - initial_wheel0_position))
+
+        if wheel0_travel_distance > expected_travel_distance:
+            break
+
+        print(expected_travel_distance, wheel0_travel_distance)
+        # reduce the speed before reaching the target
+        if expected_travel_distance - wheel0_travel_distance < 0.025:
+            set_wheels_speed(0.1 * max_wheel_speed)
+
+        step()
+
+    # reset wheels
+    set_rotation_wheels_angles(0.0, 0.0, 0.0, 0.0, True)
+    stop_wheels()
+
+
 def robot_go_forward(distance):
     print("-----------Go forward------------")
-    if distance > 0:
-        max_wheel_speed = MAX_WHEEL_SPEED
-    else:
-        max_wheel_speed = -MAX_WHEEL_SPEED
+    max_wheel_speed = MAX_WHEEL_SPEED if distance > 0 else -MAX_WHEEL_SPEED
 
     set_wheels_speed(max_wheel_speed)
     initial_wheel0_position = wheel_sensors[FLL_WHEEL].getValue()
@@ -264,7 +334,7 @@ def set_right_arm_position(shoulder_roll, shoulder_lift, upper_arm_roll, elbow_l
     right_arm_motors[ELBOW_LIFT].setVelocity(10)
     right_arm_motors[WRIST_ROLL].setVelocity(10)
 
-    if (wait_on_feedback):
+    if wait_on_feedback:
         while not ALMOST_EQUAL(right_arm_sensors[SHOULDER_ROLL].getValue(), shoulder_roll) or \
                 not ALMOST_EQUAL(right_arm_sensors[SHOULDER_LIFT].getValue(), shoulder_lift) or \
                 not ALMOST_EQUAL(right_arm_sensors[UPPER_ARM_ROLL].getValue(), upper_arm_roll) or \
@@ -364,8 +434,15 @@ def set_gripper(left, open, torqueWhenGripping, wait_on_feedback):
 def lidar_setting():
     base_laser_value = lidar[0].getRangeImage()
     print("Lidar => Left:", base_laser_value[639], "Front:", base_laser_value[300], "Right:", base_laser_value[0])
+    lidar_value = []
+    for i in range(0, 640, 64):
+        lidar_value.append(base_laser_value[i])
+
+    lidar_value.append((base_laser_value[639]))
+    print(lidar_value)
 
     loc = gps[0].getValues()
+    print("loc", loc)
 
     RFID = []
     for i in range(0, 640, 10):
@@ -374,7 +451,7 @@ def lidar_setting():
         RFID.append([x, y])
 
     # print("RFID: ", RFID)
-    return loc
+    return loc, lidar_value
 
 
 def camara_setting():
@@ -417,31 +494,42 @@ def run():
     location = [0, 0, 0]
     old_angle = imu[0].getRollPitchYaw()[2]
 
-    while robot.step(TIME_STEP) != -1:
-        wheel_motors[FLL_WHEEL].setPosition(float('Inf'))
-        wheel_motors[FLR_WHEEL].setPosition(float('Inf'))
-        wheel_motors[FRL_WHEEL].setPosition(float('Inf'))
-        wheel_motors[FRR_WHEEL].setPosition(float('Inf'))
-        wheel_motors[BLL_WHEEL].setPosition(float('Inf'))
-        wheel_motors[BLR_WHEEL].setPosition(float('Inf'))
-        wheel_motors[BRL_WHEEL].setPosition(float('Inf'))
-        wheel_motors[BRR_WHEEL].setPosition(float('Inf'))
-        wheel_motors[FLL_WHEEL].setVelocity(50)
-        wheel_motors[FLR_WHEEL].setVelocity(50)
-        wheel_motors[FRL_WHEEL].setVelocity(50)
-        wheel_motors[FRR_WHEEL].setVelocity(50)
-        wheel_motors[BLL_WHEEL].setVelocity(50)
-        wheel_motors[BLR_WHEEL].setVelocity(50)
-        wheel_motors[BRL_WHEEL].setVelocity(50)
-        wheel_motors[BRR_WHEEL].setVelocity(50)
+    lidar_value = []
 
-        new_location = lidar_setting()
+    while robot.step(TIME_STEP) != -1:
+        # wheel_motors[FLL_WHEEL].setPosition(float('Inf'))
+        # wheel_motors[FLR_WHEEL].setPosition(float('Inf'))
+        # wheel_motors[FRL_WHEEL].setPosition(float('Inf'))
+        # wheel_motors[FRR_WHEEL].setPosition(float('Inf'))
+        # wheel_motors[BLL_WHEEL].setPosition(float('Inf'))
+        # wheel_motors[BLR_WHEEL].setPosition(float('Inf'))
+        # wheel_motors[BRL_WHEEL].setPosition(float('Inf'))
+        # wheel_motors[BRR_WHEEL].setPosition(float('Inf'))
+        # wheel_motors[FLL_WHEEL].setVelocity(50)
+        # wheel_motors[FLR_WHEEL].setVelocity(50)
+        # wheel_motors[FRL_WHEEL].setVelocity(50)
+        # wheel_motors[FRR_WHEEL].setVelocity(50)
+        # wheel_motors[BLL_WHEEL].setVelocity(50)
+        # wheel_motors[BLR_WHEEL].setVelocity(50)
+        # wheel_motors[BRL_WHEEL].setVelocity(50)
+        # wheel_motors[BRR_WHEEL].setVelocity(50)
+
+        new_location, lidar_value = lidar_setting()
         old_time, location, old_angle = calculate(old_time, location, new_location, old_angle)
+
         # cameraData = camera.getImageArray()
         # print(cameraData)
         print("=================================")
-        if robot.getTime() > 8:
+        if robot.getTime() > 5:
             break
+
+
+
+    # df = pd.DataFrame(data=lidar_value + new_location[0] + new_location[2] + old_angle,
+    #                   columns=['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8', 'L9', 'L10', 'L11', 'X', 'Y', 'Angle'])
+    # writer = pd.ExcelWriter('test.xlsx', engine='xlsxwriter')
+    # df.to_excel(writer, sheet_name='welcome', index=False)
+    # writer.save()
 
 
 def inverse_kinematics():
@@ -509,7 +597,7 @@ def inverse_kinematics():
 
     print("==========================================================")
 
-    can = [5.16, 0.543, 4.58]
+    can = [5.1, 0.543, 4.57]
     robot_position = gps_base.getValues()
     print("robot_position", robot_position)
     # robot_position = [4.53, -0.0136, 3.65]
@@ -517,6 +605,7 @@ def inverse_kinematics():
     print("target position:", target_position)
     sensor = [m.getPositionSensor().getValue() for m in motors]
     initial_position = [0] + sensor[0:4] + [0] + sensor[4:6] + [0] + sensor[6:8] + [0] + sensor[8:10] + [0]
+    print("initial position:", initial_position)
     # print("initial_position:", initial_position)
     ikResults = left_arm_chain.inverse_kinematics(target_position, max_iter=IKPY_MAX_ITERATIONS,
                                                   initial_position=initial_position)
@@ -536,6 +625,35 @@ if __name__ == '__main__':
     gps_base = robot.getDevice("gps_base")
     gps_finger.enable(TIME_STEP)
     gps_base.enable(TIME_STEP)
+    # wb = Workbook()
+    # ws = wb.active
+    # set_left_arm_position(0.0, 1.35, 0.0, -2.2, 0, 0, 0.0, True)
+    # set_right_arm_position(0.0, 1.35, 0.0, -2.2, 0.0, 0.0, 0.0,True)
+    # old_time = 0
+    # location = [0, 0, 0]
+    # old_angle = imu[0].getRollPitchYaw()[2]
+    # ws.append(['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8', 'L9', 'L10', 'L11', 'X', 'Y', 'Angle'])
+    #
+    # while robot.step(TIME_STEP) != -1:
+    #     new_location, lidar_value = lidar_setting()
+    #     old_time, location, old_angle = calculate(old_time, location, new_location, old_angle)
+    #     data = lidar_value + [new_location[0]] + [new_location[2]] + [old_angle]
+    #     # print(data)
+    #     ws.append(data)
+    #     # cameraData = camera.getImageArray()
+    #     # print(cameraData)
+    #     print("=================================")
+    #     if robot.getTime() > 30:
+    #         break
+    #
+    # wb.save('excel9.xlsx')
+
+
+    # df = pd.DataFrame(data=lidar_value + new_location[0] + new_location[2] + old_angle,
+    #                   columns=['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8', 'L9', 'L10', 'L11', 'X', 'Y', 'Angle'])
+    # writer = pd.ExcelWriter('test.xlsx', engine='xlsxwriter')
+    # df.to_excel(writer, sheet_name='welcome', index=False)
+    # writer.save()
 
     x = [0.939, 0.173, 0.74]
     finger_position = gps_finger.getValues()
@@ -546,10 +664,12 @@ if __name__ == '__main__':
     print("minus:", finger_position[0] - base_position[0], finger_position[1] - base_position[1],
           finger_position[2] - base_position[2])
 
-    set_left_arm_position(0, 0, 0, 0, 0, 0, 0, True)
+    # set_left_arm_position(0, 0, 0, 0, 0, 0, 0, True)
+    # set_right_arm_position(0, 0, 0, 0, 0, 0, 0, True)
     set_gripper(True, True, 0.0, True)
     set_gripper(False, True, 0.0, True)
-    # set_left_arm_position(0.0, 1.35, 0.0, -2.2, 0, 0, 0.0, True)
+    set_left_arm_position(0.0, 1.35, 0.0, -2.2, 0, 0, 0.0, True)
+    set_right_arm_position(0.0, 1.35, 0.0, -2.2, 0.0, 0, 0,True)
     # robot_go_forward(2)
     # run()
     ikResults = inverse_kinematics()
@@ -558,13 +678,15 @@ if __name__ == '__main__':
 
     set_gripper(True, False, 20.0, True)
     set_gripper(False, False, 20.0, True)
-    robot_go_forward(-1)
+    # set_rotation_wheels_angles(3.0 * math.pi / 4, math.pi / 4, -3.0 * math.pi / 4, -math.pi / 4, True)
+    # robot_go_forward(1)
+    # robot_rotate(math.pi)
     set_gripper(True, True, 0.0, True)
     set_gripper(True, False, 20.0, True)
+
     # camara_setting()
     # set_right_arm_position(0.0, 1.35, 0.0, -2.2, 0.0, True)
     # set_right_arm_position(0, 0, 0, 0, 0, True)
 
     # set_gripper(True, True, 0.0, True)
     # set_gripper(False, True, 0.0, True)
-    # set_left_arm_position(0.0, 1.35, 0.0, -2.2, 0.0, True)
